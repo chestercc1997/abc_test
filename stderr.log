@@ -1,0 +1,3 @@
+** cmd error: unknown command '&detect_faha'
+(this is likely caused by using an alias defined in "abc.rc"
+without having this file in the current or parent directory)
