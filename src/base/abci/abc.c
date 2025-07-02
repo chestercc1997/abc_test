@@ -45463,20 +45463,18 @@ usage:
 
 
 int Abc_Command_detecting_ha_fa(Abc_Frame_t *pAbc) {
-    // 检查 pGia 是否为空
+ 
     if (pAbc->pGia == NULL) {
         printf("{\"error\": \"There is no AIG\"}\n");
         return 1;
     }
 
-    // 调用检测函数
     GiaDetectingResults *results = Gia_detecting_ha_fa(pAbc->pGia);
     if (results == NULL) {
         printf("{\"error\": \"Failed to detect HA/FA\"}\n");
         return 1;
     }
 
-    // 打开 JSON 文件以写入结果
     FILE *file = fopen("detect_faha_output.json", "w");
     if (file == NULL) {
         printf("{\"error\": \"Failed to open file for writing\"}\n");
@@ -45484,48 +45482,37 @@ int Abc_Command_detecting_ha_fa(Abc_Frame_t *pAbc) {
         return 1;
     }
 
-    // 写入 JSON 格式数据到文件
     fprintf(file, "{\n");
 
-    // 写入 xor2_list
     fprintf(file, "  \"xor2_list\": ");
     Vec_IntPrintToFile(file, results->xor2_list);
     fprintf(file, ",\n");
 
-    // 写入 xor3_list
     fprintf(file, "  \"xor3_list\": ");
     Vec_IntPrintToFile(file, results->xor3_list);
     fprintf(file, ",\n");
 
-    // 写入 xor_all_list
     fprintf(file, "  \"xor_all_list\": ");
     Vec_IntPrintToFile(file, results->xor_all_list);
     fprintf(file, ",\n");
 
-    // 写入 xor_remaining
     fprintf(file, "  \"xor_remaining\": ");
     Vec_IntPrintToFile(file, results->xor_remaining);
     fprintf(file, ",\n");
 
-    // 写入 ha
     fprintf(file, "  \"ha\": ");
     Vec_IntPrintToFile(file, results->xor2_maj2_combined);
     fprintf(file, ",\n");
 
-    // 写入 fa
     fprintf(file, "  \"fa\": ");
     Vec_IntPrintToFile(file, results->xor3_maj3_combined);
-    fprintf(file, "\n"); // 最后一行没有逗号
+    fprintf(file, "\n"); 
 
     fprintf(file, "}\n");
-
-    // 关闭文件
     fclose(file);
 
-    // 打印成功信息到控制台
     printf("Results successfully written to detect_faha_output.json\n");
 
-    // 释放结果
     Gia_free_detecting_results(results);
 
     return 0;

@@ -1988,7 +1988,7 @@ static inline void Vec_IntPrint( Vec_Int_t * vVec )
         printf( " %d", Entry );
     printf( " }\n" );
 }
-void Vec_IntPrint1(Vec_Int_t *v) {
+static inline void Vec_IntPrint1(Vec_Int_t *v) {
     if (v == NULL) {
         printf("null");
         return;
@@ -2012,7 +2012,7 @@ static inline void Vec_IntPrintBinary( Vec_Int_t * vVec )
     Vec_IntForEachEntry( vVec, Entry, i )
         printf( "%d", (int)(Entry != 0) );
 }
-void Vec_IntPrintToFile(FILE *file, Vec_Int_t *vec) {
+static inline void Vec_IntPrintToFile(FILE *file, Vec_Int_t *vec) {
     if (vec == NULL || file == NULL) {
         fprintf(file, "[]"); // 如果向量为空，写入空数组
         return;

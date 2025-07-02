@@ -1,5 +1,6 @@
-./abc
+abc
 *.v
 *.blif
 *.torch
 *.eqn
+/data/cchen/abc_test/abc

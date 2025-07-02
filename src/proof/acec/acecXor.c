@@ -392,7 +392,7 @@ void Gia_edgelist(Gia_Man_t * p, char *f0, char *f1, char *f2)
         fprintf(f_feats, "0,0,0,0\n", Gia_ObjId(p,pObj));
     Gia_ManForEachAnd( p, pObj, i ){
         //printf("%d %d  %d\n", Gia_ObjFaninId0(pObj, Gia_ObjId(p,pObj)), Gia_ObjId(p,pObj), Gia_ObjFaninC0(pObj));
-        fprintf(f_el, "%d %d\n", Gia_ObjFaninId0(pObj, Gia_ObjId(p,pObj))-1, Gia_ObjId(p,pObj)-1);
+        fprintf(f_el, "%d %d\n", Gia_ObjFaninId0(pObj, Gia_ObjId(p,pObj))-1, Gia_ObjId(p,pObj)-1); // indicate the topo order
         //printf("%d %d  %d\n", Gia_ObjFaninId1(pObj, Gia_ObjId(p,pObj)), Gia_ObjId(p,pObj), Gia_ObjFaninC1(pObj));
         fprintf(f_el, "%d %d\n", Gia_ObjFaninId1(pObj, Gia_ObjId(p,pObj))-1, Gia_ObjId(p,pObj)-1);
         // feats with complement values
@@ -466,19 +466,92 @@ Vec_Int_t * extractMaj(Vec_Int_t * vAdds)
 }
 
 
-void recursiveXor(Gia_Man_t * p,Vec_Int_t * vInput,int xor2_traversal,Vec_Int_t * xor2_record) {
-            Gia_Obj_t * pObj;
-            pObj = Gia_ManObj(p, xor2_traversal);
-            int fanin0 = Gia_ObjFaninId0p(p,pObj);
-            int fanin1 = Gia_ObjFaninId1p(p,pObj);
-            Vec_IntPushUnique(xor2_record, fanin0);
-            Vec_IntPushUnique(xor2_record, fanin1);
-            if (Vec_IntFind(vInput,fanin0)==-1)
-                recursiveXor(p, vInput, fanin0, xor2_record); // 递归调用
-            if (Vec_IntFind(vInput,fanin1)==-1)
-                recursiveXor(p, vInput, fanin1, xor2_record); // 递归调用
-
+void recursiveXor(Gia_Man_t * p, Vec_Int_t * vInput, int xor2_traversal, Vec_Int_t * xor2_record) {
+    // 使用栈来实现迭代版本，避免递归栈溢出和segfault
+    Vec_Int_t * pStack = Vec_IntAlloc(1000);  // 创建工作栈
+    Vec_Int_t * pVisited = Vec_IntAlloc(1000); // 记录已访问的节点，避免重复
+    
+    // 输入验证
+    if (p == NULL || vInput == NULL || xor2_record == NULL) {
+        printf("Error: NULL pointer passed to recursiveXor\n");
+        Vec_IntFree(pStack);
+        Vec_IntFree(pVisited);
+        return;
+    }
+    
+    // 验证初始对象ID - 这是防止segfault的关键检查
+    if (xor2_traversal < 0 || xor2_traversal >= Gia_ManObjNum(p)) {
+        printf("Warning: Invalid initial object ID %d in recursiveXor (valid range: 0-%d)\n", 
+               xor2_traversal, Gia_ManObjNum(p) - 1);
+        Vec_IntFree(pStack);
+        Vec_IntFree(pVisited);
+        return;
+    }
+    
+    // 将初始节点推入栈
+    Vec_IntPush(pStack, xor2_traversal);
+    
+    // 迭代处理栈中的节点
+    while (Vec_IntSize(pStack) > 0) {
+        int current_id = Vec_IntPop(pStack);
+        
+        // 检查是否已访问过此节点（避免循环）
+        if (Vec_IntFind(pVisited, current_id) != -1) {
+            continue;
         }
+        Vec_IntPush(pVisited, current_id);
+        
+        // 再次验证当前对象ID（防御性编程）
+        if (current_id < 0 || current_id >= Gia_ManObjNum(p)) {
+            printf("Warning: Invalid object ID %d encountered in recursiveXor\n", current_id);
+            continue;
+        }
+        
+        Gia_Obj_t * pObj = Gia_ManObj(p, current_id);
+        
+        // 验证对象指针 - 防止访问无效内存
+        if (pObj == NULL) {
+            printf("Warning: NULL object returned for ID %d in recursiveXor\n", current_id);
+            continue;
+        }
+        
+        // 如果不是AND门，只记录ID并继续
+        if (!Gia_ObjIsAnd(pObj)) {
+            Vec_IntPushUnique(xor2_record, current_id);
+            continue;
+        }
+        
+        // 获取扇入
+        int fanin0 = Gia_ObjFaninId0p(p, pObj);
+        int fanin1 = Gia_ObjFaninId1p(p, pObj);
+        
+        // 验证扇入ID的有效性 - 防止后续递归中的segfault
+        if (fanin0 < 0 || fanin0 >= Gia_ManObjNum(p)) {
+            printf("Warning: Invalid fanin0 ID %d for object %d\n", fanin0, current_id);
+            continue;
+        }
+        if (fanin1 < 0 || fanin1 >= Gia_ManObjNum(p)) {
+            printf("Warning: Invalid fanin1 ID %d for object %d\n", fanin1, current_id);
+            continue;
+        }
+        
+        // 记录扇入
+        Vec_IntPushUnique(xor2_record, fanin0);
+        Vec_IntPushUnique(xor2_record, fanin1);
+        
+        // 如果扇入不在输入列表中，将其加入栈继续遍历
+        if (Vec_IntFind(vInput, fanin0) == -1 && Vec_IntFind(pVisited, fanin0) == -1) {
+            Vec_IntPush(pStack, fanin0);
+        }
+        if (Vec_IntFind(vInput, fanin1) == -1 && Vec_IntFind(pVisited, fanin1) == -1) {
+            Vec_IntPush(pStack, fanin1);
+        }
+    }
+    
+    // 清理内存
+    Vec_IntFree(pStack);
+    Vec_IntFree(pVisited);
+}
 typedef struct {
     Vec_Int_t *xor2_list;
     Vec_Int_t *maj2_list;
@@ -1376,7 +1449,7 @@ Acec_Box_t * Acec_ProduceBox( Gia_Man_t * p, int fVerbose )
 
     Ree_ManPrintAdders( vAdds, 1 );
     if ( fVerbose )
-        printf( "Detected %d full-adders and %d half-adders.  Found %d XOR-cuts.  ", Ree_ManCountFadds(vAdds), Vec_IntSize(vAdds)/6-Ree_ManCountFadds(vAdds), Vec_IntSize(vXors)/4 );
+        Abc_Print( "Detected %d full-adders and %d half-adders.  Found %d XOR-cuts.  ", Ree_ManCountFadds(vAdds), Vec_IntSize(vAdds)/6-Ree_ManCountFadds(vAdds), Vec_IntSize(vXors)/4 );
     if ( fVerbose )
         Abc_PrintTime( 1, "Time", Abc_Clock() - clk );
 
